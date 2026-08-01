@@ -23,8 +23,8 @@ from PIL import Image, ImageChops, ImageSequence
 # a reload mid-render, killing the in-flight request.
 TEMP_ROOT = Path(tempfile.gettempdir()) / "math_animator_jobs"
 SCENE_NAME = "GeneratedScene"
-RENDER_TIMEOUT_SECONDS = 60
-FFMPEG_TIMEOUT_SECONDS = 30
+RENDER_TIMEOUT_SECONDS = 170
+FFMPEG_TIMEOUT_SECONDS = 60
 MAX_LATEX_LENGTH = 500
 JOB_TTL_SECONDS = 600
 JOB_ID_PATTERN = re.compile(r"^[0-9a-f]{12}$")
