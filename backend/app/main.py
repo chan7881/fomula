@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
+import threading
+from functools import wraps
 
 from app.manim_service import (
     ManimRenderError,
@@ -21,6 +23,21 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
+
+MAX_CONCURRENT_RENDERS = 2
+_render_semaphore = threading.Semaphore(MAX_CONCURRENT_RENDERS)
+
+
+def _limit_concurrency(func):
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        if not _render_semaphore.acquire(blocking=False):
+            raise HTTPException(status_code=503, detail="서버가 렌더링 요청을 많이 처리 중입니다. 잠시 후 다시 시도해주세요.")
+        try:
+            return func(*args, **kwargs)
+        finally:
+            _render_semaphore.release()
+    return wrapper
 
 
 HEX_COLOR_PATTERN = r"^#[0-9A-Fa-f]{6}$"
