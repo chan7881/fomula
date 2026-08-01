@@ -298,7 +298,7 @@ def _trim_gif(
         save_all=True,
         append_images=cropped[1:],
         duration=durations,
-        loop=im.info.get("loop", 0),
+        loop=1,
         disposal=2,
         optimize=True,
     )
