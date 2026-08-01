@@ -21,7 +21,7 @@ export async function generateAnimation(
         text_color: textColor,
         font_size: fontSize,
       },
-      { timeout: 90_000 },
+      { timeout: 240_000 },
     );
     const { gif_url, mp4_url, png_url } = response.data;
     return {
