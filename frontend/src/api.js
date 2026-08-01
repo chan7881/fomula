@@ -74,7 +74,7 @@ export async function generateChart({
         width,
         height,
       },
-      { timeout: 90_000 },
+      { timeout: 240_000 },
     );
     const { gif_url, mp4_url, png_url } = response.data;
     return {
@@ -94,7 +94,7 @@ function extractErrorMessage(error) {
     return "렌더링 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.";
   }
   if (error.code === "ERR_NETWORK") {
-    return "백엔드 서버(localhost:8000)에 연결할 수 없습니다. run.bat의 Backend 창이 열려 있는지, 5173/8000 포트가 다른 프로그램에 점유되지 않았는지 확인해주세요.";
+    return `백엔드 서버(${API_BASE_URL})에 연결할 수 없습니다. 서버가 잠들어 있다가 깨어나는 중일 수 있습니다. 1~2분 후 다시 시도해주세요.`;
   }
   return error.message || "알 수 없는 오류가 발생했습니다.";
 }
