@@ -86,6 +86,19 @@ def _build_scene_source(
     if not transparent_background:
         lines.append(f"        self.camera.background_color = {background_color!r}")
     lines.append(f"        eq = MathTex({latex!r}, color={text_color!r}, font_size={font_size!r})")
+    # A long/large equation can be wider or taller than the camera frame at
+    # render time — trimming afterwards only crops background, it can't
+    # recover content that fell outside the frame. Widen the frame to fit
+    # the equation instead of shrinking the equation to fit the frame: pixel
+    # resolution (-r) is fixed independently of frame size in Manim units, so
+    # shrinking eq would shrink its pixel footprint (and post-trim output
+    # size) too — widening the view keeps the equation, and the output, at
+    # its intended font_size/resolution regardless of how long it is.
+    lines.append("        max_w, max_h = config.frame_width - 1, config.frame_height - 1")
+    lines.append("        if eq.width > max_w or eq.height > max_h:")
+    lines.append("            scale_factor = max(eq.width / max_w, eq.height / max_h)")
+    lines.append("            self.camera.frame_width = config.frame_width * scale_factor")
+    lines.append("            self.camera.frame_height = config.frame_height * scale_factor")
     lines.append("        self.play(Write(eq))")
     lines.append("        self.wait(1)")
     return "\n".join(lines) + "\n"
@@ -293,12 +306,17 @@ def _trim_gif(
     if not transparent_background:
         cropped = [frame.convert("RGB") for frame in cropped]
 
+    # crop()/convert() carry the source GIF's info dict along (including its
+    # own "loop" value), and Pillow's GIF encoder falls back to im.info["loop"]
+    # when no loop= kwarg is given — so a leftover loop=0 from Manim's render
+    # silently makes the trimmed GIF repeat forever unless this is cleared.
+    cropped[0].info.pop("loop", None)
+
     cropped[0].save(
         gif_path,
         save_all=True,
         append_images=cropped[1:],
         duration=durations,
-        loop=1,
         disposal=2,
         optimize=True,
     )
@@ -325,7 +343,12 @@ def _convert_gif_to_mp4(gif_path: Path, mp4_path: Path) -> None:
     ]
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=FFMPEG_TIMEOUT_SECONDS
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=FFMPEG_TIMEOUT_SECONDS,
         )
     except subprocess.TimeoutExpired:
         raise ManimRenderError("MP4 conversion timed out.")
@@ -415,6 +438,8 @@ def _render_scene(
                 cwd=job_dir,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
+                errors="replace",
                 timeout=RENDER_TIMEOUT_SECONDS,
             )
         except subprocess.TimeoutExpired:
@@ -455,7 +480,11 @@ def render_latex(
     """Renders `latex` to TEMP_ROOT/<job_id>/output.gif, plus output.mp4
     unless the background is transparent (MP4/h264 has no alpha channel).
     """
-    latex = latex.strip()
+    # A blank line here becomes a bare \par inside MathTex's align* wrapper,
+    # which LaTeX rejects outright ("Paragraph ended before \align* was
+    # complete") — collapse all embedded newlines to spaces since a single
+    # inline expression was never meant to contain line breaks anyway.
+    latex = re.sub(r"\s*\n\s*", " ", latex).strip()
     if not latex:
         raise ManimRenderError("LaTeX string is empty.")
     if len(latex) > MAX_LATEX_LENGTH:
